@@ -1,0 +1,257 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# data files
+readonly GLOBAL_INDEXFILE="$HOME/.bookmarks/index.html"
+readonly GLOBAL_STYLEFILE="$HOME/.bookmarks/style.css"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ---------------
+# init_index_file
+# ---------------
+#
+#
+#
+function init_index_file()
+{
+  # get directory
+  local INDEXDIR=$(dirname "$GLOBAL_INDEXFILE")
+
+  # check if directory is missing
+  if [ ! -d "$INDEXDIR" ] ; then
+
+    # try to create directory
+    mkdir --parents "$INDEXDIR"
+
+    # check if directory is still missing
+    if [ ! -d "$INDEXDIR" ] ; then
+
+      # notify user
+      failmsg "unable to create directory: \"$INDEXDIR\""
+
+      # signalize trouble
+      return 1
+
+    fi
+
+  fi
+
+  # check if index file is missing
+  if [ ! -s "$GLOBAL_INDEXFILE" ] ; then
+
+    # create initial index file
+    {
+
+      echo "<!DOCTYPE html>"
+      echo "<html lang=\"de\">"
+      echo "<head>"
+      echo "<meta charset=\"UTF-8\">"
+      echo "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\">"
+      echo "<title>Bookmarks</title>"
+      echo "</head>"
+      echo "<body>"
+      echo "<p>"
+      echo "<span><a href=\"https://www.google.de\" target=\"_blank\">Google</a></span>"
+      echo "<span><a href=\"https://www.youtube.com/\" target=\"_blank\">YouTube</a></span>"
+      echo "<span><a href=\"https://de.wikipedia.org/wiki/Wikipedia:Hauptseite\" target=\"_blank\">Wikipedia</a></span>"
+      echo "<span><a href=\"https://github.com/explore\" target=\"_blank\">GitHub</a></span>"
+      echo "<span><a href=\"https://www.w3schools.com/cssref/default.asp\" target=\"_blank\">CSS Reference</a></span>"
+      echo "<span><a href=\"https://validator.w3.org/\" target=\"_blank\">Markup Validation Service</a></span>"
+      echo "<span><a href=\"http://de.cppreference.com/w/\" target=\"_blank\">C++ Referenz</a></span>"
+      echo "<span><a href=\"http://tldp.org/LDP/abs/html/index.html#AEN39\" target=\"_blank\">Advanced Bash-Scripting Guide</a></span>"
+      echo "<span><a href=\"https://www.tug.org/utilities/plain/cseq.html\" target=\"_blank\">TeX Primitive Control Sequences</a></span>"
+      echo "</p>"
+      echo "<hr />"
+      echo "<!-- INSERT:HERE:DO:NOT:REMOVE:THIS:LINE -->"
+      echo "<!-- STOP:SORTING:HERE:DO:NOT:REMOVE:THIS:LINE -->"
+      echo "</body>"
+      echo "</html>"
+
+    } > "$GLOBAL_INDEXFILE"
+
+    # check if index file is still missing
+    if [ ! -s "$GLOBAL_INDEXFILE" ] ; then
+
+      # notify user
+      failmsg "unable to create index file: \"$GLOBAL_INDEXFILE\""
+
+      # signalize trouble
+      return 1
+
+    fi
+
+  fi
+
+  # signalize success
+  return 0
+}
+
+# ---------------
+# init_style_file
+# ---------------
+#
+#
+#
+function init_style_file()
+{
+  # get directory
+  local STYLEDIR=$(dirname "$GLOBAL_STYLEFILE")
+
+  # check if directory is missing
+  if [ ! -d "$STYLEDIR" ] ; then
+
+    # try to create directory
+    mkdir --parents "$STYLEDIR"
+
+    # check if directory is still missing
+    if [ ! -d "$STYLEDIR" ] ; then
+
+      # notify user
+      failmsg "unable to create directory: \"$STYLEDIR\""
+
+      # signalize trouble
+      return 1
+
+    fi
+
+  fi
+
+  # check if style file is missing
+  if [ ! -s "$GLOBAL_STYLEFILE" ] ; then
+
+    # create initial style file
+    {
+
+      echo "span {"
+      echo "  display:inline-block;"
+      echo "  width:33%;"
+      echo "  margin-top:0.5ex;"
+      echo "  text-overflow:ellipsis;"
+      echo "  overflow:hidden;"
+      echo "  white-space:nowrap;"
+      echo "}"
+      echo
+      echo "a { color:black; text-decoration:none; } "
+      echo
+
+    } > "$GLOBAL_STYLEFILE"
+
+    # check if style file is still missing
+    if [ ! -s "$GLOBAL_STYLEFILE" ] ; then
+
+      # notify user
+      failmsg "unable to create style file: \"$GLOBAL_STYLEFILE\""
+
+      # signalize trouble
+      return 1
+
+    fi
+
+  fi
+
+  # signalize success
+  return 0
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# init index file
+if ! init_index_file ; then
+
+  # signalize trouble
+  return 1
+
+fi
+
+# init style file
+if ! init_style_file ; then
+
+  # signalize trouble
+  return 1
+
+fi
+
+# signalize success
+exit 0
+

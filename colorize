@@ -1,0 +1,387 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# bookmark files
+readonly GLOBAL_INDEXFILE="$HOME/.bookmarks/index.html"
+readonly GLOBAL_STYLEFILE="$HOME/.bookmarks/style.css"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# -------------
+# get_first_tag
+# -------------
+#
+# $1  filename
+# $2  tag
+#
+function get_first_tag()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        s/^[[:space:]]*$2=(.*)/\1/p ; T ; q
+
+      " "$1"
+}
+
+# --------------------
+# get_all_used_classes
+# --------------------
+#
+# This function pushes all used classes from the bookmarks file to stdout.
+# A class name should not contain spaces.
+#
+function get_all_used_classes()
+{
+  cat "$GLOBAL_INDEXFILE"                    \
+  | sed -nre "s/.+class=\"([^\"]+)\".+/\1/p" \
+  | sed -re "s/[[:space:]]+/\x0A/"           \
+  | sort                                     \
+  | uniq                                     \
+  | sed -re "s/^/# CLASS=/"
+}
+
+# -------------------------
+# get_all_specified_classes
+# -------------------------
+#
+# This function pushes all non-comment lines to stdout.
+#
+# $1  filename
+#
+function get_all_specified_classes()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # skip long comments
+        /^[[:space:]]*#>>#/,/#<<#[[:space:]]*$/ { d }
+
+        # skip short comments
+        /^[[:space:]]*#/ { d }
+
+        # skip empty lines
+        /^[[:space:]]*$/ { d }
+
+        # crop class name
+        s/^[[:space:]]*CLASS=(.+)/\1/
+
+        # no class found
+        T
+
+        # trim line
+        s/^[[:space:]]+//
+        s/[[:space:]]+$//
+
+        # print lines with at least one visible character
+        /[^[:space:]]/ { p }
+
+      " "$1"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# init files
+if ! ./0.init ; then
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# create temporary file
+TEMPFILE=$(mktemp)
+
+# remove temporary file on exit
+trap 'rm -f "$TEMPFILE"' EXIT
+
+# redirect entire group
+{
+
+  # find current classes
+  get_all_used_classes
+
+  echo
+
+  echo "# COLOR=AliceBlue"
+  echo "# COLOR=AntiqueWhite"
+  echo "# COLOR=Aqua"
+  echo "# COLOR=Aquamarine"
+  echo "# COLOR=Azure"
+  echo "# COLOR=Beige"
+  echo "# COLOR=Bisque"
+  echo "# COLOR=Black"
+  echo "# COLOR=BlanchedAlmond"
+  echo "# COLOR=Blue"
+  echo "# COLOR=BlueViolet"
+  echo "# COLOR=Brown"
+  echo "# COLOR=BurlyWood"
+  echo "# COLOR=CadetBlue"
+  echo "# COLOR=Chartreuse"
+  echo "# COLOR=Chocolate"
+  echo "# COLOR=Coral"
+  echo "# COLOR=CornflowerBlue"
+  echo "# COLOR=Cornsilk"
+  echo "# COLOR=Crimson"
+  echo "# COLOR=Cyan"
+  echo "# COLOR=DarkBlue"
+  echo "# COLOR=DarkCyan"
+  echo "# COLOR=DarkGoldenRod"
+  echo "# COLOR=DarkGray"
+  echo "# COLOR=DarkGreen"
+  echo "# COLOR=DarkGrey"
+  echo "# COLOR=DarkKhaki"
+  echo "# COLOR=DarkMagenta"
+  echo "# COLOR=DarkOliveGreen"
+  echo "# COLOR=DarkOrange"
+  echo "# COLOR=DarkOrchid"
+  echo "# COLOR=DarkRed"
+  echo "# COLOR=DarkSalmon"
+  echo "# COLOR=DarkSeaGreen"
+  echo "# COLOR=DarkSlateBlue"
+  echo "# COLOR=DarkSlateGray"
+  echo "# COLOR=DarkSlateGrey"
+  echo "# COLOR=DarkTurquoise"
+  echo "# COLOR=DarkViolet"
+  echo "# COLOR=DeepPink"
+  echo "# COLOR=DeepSkyBlue"
+  echo "# COLOR=DimGray"
+  echo "# COLOR=DimGrey"
+  echo "# COLOR=DodgerBlue"
+  echo "# COLOR=FireBrick"
+  echo "# COLOR=FloralWhite"
+  echo "# COLOR=ForestGreen"
+  echo "# COLOR=Fuchsia"
+  echo "# COLOR=Gainsboro"
+  echo "# COLOR=GhostWhite"
+  echo "# COLOR=Gold"
+  echo "# COLOR=GoldenRod"
+  echo "# COLOR=Gray"
+  echo "# COLOR=Green"
+  echo "# COLOR=GreenYellow"
+  echo "# COLOR=Grey"
+  echo "# COLOR=HoneyDew"
+  echo "# COLOR=HotPink"
+  echo "# COLOR=IndianRed"
+  echo "# COLOR=Indigo"
+  echo "# COLOR=Ivory"
+  echo "# COLOR=Khaki"
+  echo "# COLOR=Lavender"
+  echo "# COLOR=LavenderBlush"
+  echo "# COLOR=LawnGreen"
+  echo "# COLOR=LemonChiffon"
+  echo "# COLOR=LightBlue"
+  echo "# COLOR=LightCoral"
+  echo "# COLOR=LightCyan"
+  echo "# COLOR=LightGoldenRodYellow"
+  echo "# COLOR=LightGray"
+  echo "# COLOR=LightGreen"
+  echo "# COLOR=LightGrey"
+  echo "# COLOR=LightPink"
+  echo "# COLOR=LightSalmon"
+  echo "# COLOR=LightSeaGreen"
+  echo "# COLOR=LightSkyBlue"
+  echo "# COLOR=LightSlateGray"
+  echo "# COLOR=LightSlateGrey"
+  echo "# COLOR=LightSteelBlue"
+  echo "# COLOR=LightYellow"
+  echo "# COLOR=Lime"
+  echo "# COLOR=LimeGreen"
+  echo "# COLOR=Linen"
+  echo "# COLOR=Magenta"
+  echo "# COLOR=Maroon"
+  echo "# COLOR=MediumAquaMarine"
+  echo "# COLOR=MediumBlue"
+  echo "# COLOR=MediumOrchid"
+  echo "# COLOR=MediumPurple"
+  echo "# COLOR=MediumSeaGreen"
+  echo "# COLOR=MediumSlateBlue"
+  echo "# COLOR=MediumSpringGreen"
+  echo "# COLOR=MediumTurquoise"
+  echo "# COLOR=MediumVioletRed"
+  echo "# COLOR=MidnightBlue"
+  echo "# COLOR=MintCream"
+  echo "# COLOR=MistyRose"
+  echo "# COLOR=Moccasin"
+  echo "# COLOR=NavajoWhite"
+  echo "# COLOR=Navy"
+  echo "# COLOR=OldLace"
+  echo "# COLOR=Olive"
+  echo "# COLOR=OliveDrab"
+  echo "# COLOR=Orange"
+  echo "# COLOR=OrangeRed"
+  echo "# COLOR=Orchid"
+  echo "# COLOR=PaleGoldenRod"
+  echo "# COLOR=PaleGreen"
+  echo "# COLOR=PaleTurquoise"
+  echo "# COLOR=PaleVioletRed"
+  echo "# COLOR=PapayaWhip"
+  echo "# COLOR=PeachPuff"
+  echo "# COLOR=Peru"
+  echo "# COLOR=Pink"
+  echo "# COLOR=Plum"
+  echo "# COLOR=PowderBlue"
+  echo "# COLOR=Purple"
+  echo "# COLOR=RebeccaPurple"
+  echo "# COLOR=Red"
+  echo "# COLOR=RosyBrown"
+  echo "# COLOR=RoyalBlue"
+  echo "# COLOR=SaddleBrown"
+  echo "# COLOR=Salmon"
+  echo "# COLOR=SandyBrown"
+  echo "# COLOR=SeaGreen"
+  echo "# COLOR=SeaShell"
+  echo "# COLOR=Sienna"
+  echo "# COLOR=Silver"
+  echo "# COLOR=SkyBlue"
+  echo "# COLOR=SlateBlue"
+  echo "# COLOR=SlateGray"
+  echo "# COLOR=SlateGrey"
+  echo "# COLOR=Snow"
+  echo "# COLOR=SpringGreen"
+  echo "# COLOR=SteelBlue"
+  echo "# COLOR=Tan"
+  echo "# COLOR=Teal"
+  echo "# COLOR=Thistle"
+  echo "# COLOR=Tomato"
+  echo "# COLOR=Turquoise"
+  echo "# COLOR=Violet"
+  echo "# COLOR=Wheat"
+  echo "# COLOR=White"
+  echo "# COLOR=WhiteSmoke"
+  echo "# COLOR=Yellow"
+  echo "# COLOR=YellowGreen"
+
+} > "$TEMPFILE"
+
+# wait for user input
+./0.tempmod -w400 -h650 "$TEMPFILE" &>"/dev/null"
+
+# empty temp file
+if [ ! -s "$TEMPFILE" ] ; then
+
+  # remove all background colors
+  sed -i".bak" -re "/^\..+\{ background-color:[^;]+; \}$/ { d }" "$GLOBAL_STYLEFILE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# get first specified color
+BACKCOLOR=$(get_first_tag "$TEMPFILE" "COLOR")
+
+# check given color
+if [ -z "$BACKCOLOR" ] ; then
+
+  # set default value
+  BACKCOLOR="Yellow"
+
+fi
+
+# remove background color
+sed -i".bak" -re "/\{ background-color:$BACKCOLOR; \}/ { d }" "$GLOBAL_STYLEFILE"
+
+# clear specified classes
+while read CLASS
+do
+
+  # remove style of this class
+  sed -i -re "/^\.$CLASS \{/ { d }" "$GLOBAL_STYLEFILE"
+
+done < <(get_all_specified_classes "$TEMPFILE")
+
+# set specified color
+while read CLASS
+do
+
+  # set style
+  echo ".$CLASS { background-color:$BACKCOLOR; }"
+
+done < <(get_all_specified_classes "$TEMPFILE") >> "$GLOBAL_STYLEFILE"
+
+# signalize success
+exit 0
+

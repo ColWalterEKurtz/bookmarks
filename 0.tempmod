@@ -1,0 +1,199 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+POSX="-1"
+POSY="-1"
+WINW="-1"
+WINH="-1"
+
+# set options to accept
+readonly KNOWN_OPTIONS=":x:y:w:h:"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # x coordinate
+    "x") POSX="$OPTARG"
+         ;;
+
+    # y coordinate
+    "y") POSY="$OPTARG"
+         ;;
+
+    # width
+    "w") WINW="$OPTARG"
+         ;;
+
+    # height
+    "h") WINH="$OPTARG"
+         ;;
+
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# drop all parsed options
+shift $(( OPTIND - 1 ))
+
+# check number of positional parameters
+if (( PPNUM != 1 )) ; then
+
+  # notify user
+  failmsg "no filename given"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# check given file
+if [ ! -f "$1" ] ; then
+
+  # notify user
+  failmsg "unable to locate file; \"$1\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# launch leafpad in background
+leafpad "$1" &
+
+# get process ID
+PID="$!"
+
+# reset window ID
+WID=""
+
+# wait for window to be shown
+while [ -z "$WID" ]
+do
+
+  # get window ID
+  WID=$(wmctrl -lp | sed -nre "s/^(0x[[:xdigit:]]+) +[^[:space:]]+ +$PID .+/\1/p")
+
+done
+
+# move and resize window
+#   A move and resize argument has the format 'g,x,y,w,h'. All five components
+#   are integers. The first value, g, is the gravity of the window, with 0
+#   being the most common value (the default value for the window).
+#   The four remaining values are a standard geometry specification: x,y is the
+#   position of the top left corner of the window, and w,h is the width and height
+#   of the window, with the exception that the value of -1 in any position is
+#   interpreted to mean that the current geometry value should not be modified.
+wmctrl -ir "$WID" -e "0,$POSX,$POSY,$WINW,$WINH"
+
+# set 'always on top'
+wmctrl -ir "$WID" -b "add,above"
+
+# wait for leafpad to close
+wait "$PID"
+
+# signalize success
+exit 
+

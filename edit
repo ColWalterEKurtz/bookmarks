@@ -1,0 +1,216 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# bookmark files
+readonly GLOBAL_INDEXFILE="$HOME/.bookmarks/index.html"
+readonly GLOBAL_STYLEFILE="$HOME/.bookmarks/style.css"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# --------------
+# get_first_line
+# --------------
+#
+# $1  filename
+#
+function get_first_line()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # skip long comments
+        /^[[:space:]]*#>>#/,/#<<#[[:space:]]*$/ { d }
+
+        # skip short comments
+        /^[[:space:]]*#/ { d }
+
+        # skip empty lines
+        /^[[:space:]]*$/ { d }
+
+        # print (only) first line
+        p ; q
+
+      " "$1"
+}
+
+# -----------------
+# get_current_title
+# -----------------
+#
+# $1  href (regular expression)
+#
+function get_current_title()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # search given href
+        /href=\"$1\"/ {
+
+          # grep current title
+          s/.+target=\"_blank\">([^<]*)<.+/\1/
+
+          # trim line
+          s/^[[:space:]]+//
+          s/[[:space:]]+$//
+
+          # print non-empty line
+          /[^[:space:]]/ { p }
+
+          # quit
+          q
+        }
+      " "$GLOBAL_INDEXFILE"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# init files
+if ! ./0.init ; then
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# create temporary file
+TEMPFILE=$(mktemp)
+
+# remove temporary file on exit
+trap 'rm -f "$TEMPFILE"' EXIT
+
+# redirect entire group
+{
+
+  echo "# drop href to edit:"
+  echo
+  echo
+  echo
+
+} > "$TEMPFILE"
+
+# wait for user input
+./0.tempmod -x5 -y105 -w800 -h125 "$TEMPFILE" &>"/dev/null"
+
+# get first line that is not a comment
+HREF=$(get_first_line "$TEMPFILE")
+
+# no text found
+if [ -z "$HREF" ] ; then
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# get regular expression
+SEARCH=$(./0.substitute 1 <<< "$HREF")
+
+# get current title
+get_current_title "$SEARCH" | ./0.htmlescape -u > "$TEMPFILE"
+
+# wait for user input
+./0.tempmod -x5 -y105 -w800 -h125 "$TEMPFILE" &>"/dev/null"
+
+# get first line that is not a comment
+TITLE=$(get_first_line "$TEMPFILE" | ./0.htmlescape | ./0.substitute 2)
+
+# no text found
+if [ -z "$TITLE" ] ; then
+
+  # notify user
+  failmsg "no bookmark edited: no title found"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# update title
+sed -i".bak" -re "s/(<a href=\"$SEARCH\" target=\"_blank\">)[^<]*(<\/a>.*)/\1$TITLE\2/" "$GLOBAL_INDEXFILE"
+
+# signalize success
+exit 0
+

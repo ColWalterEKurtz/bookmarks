@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# check numnber of arguments
+if (( $# != 1 )) ; then
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# s/1/2/
+if [ "$1" == 1 ] ; then
+
+  # format search expression
+  sed --regexp-extended \
+      --expression="
+
+        # escape escape character first
+        s/\\\\/\\\\\\\\/g
+
+        # escape expected sed separators
+        s/\//\\\\\//g
+        s/\"/\\\\\"/g
+
+        # escape syntax characters
+        s/\[/\\\\[/g
+        s/\]/\\\\]/g
+        s/\(/\\\\(/g
+        s/\)/\\\\)/g
+        s/\{/\\\\{/g
+        s/\}/\\\\}/g
+        s/\./\\\\./g
+        s/\+/\\\\+/g
+        s/\*/\\\\*/g
+        s/\?/\\\\?/g
+        s/\|/\\\\|/g
+        s/\^/\\\\^/g
+        s/\\\$/\\\\$/g
+      "
+
+else
+
+  # format paste expression
+  sed --regexp-extended \
+      --expression="
+
+        # escape escape character first
+        s/\\\\/\\\\\\\\/g
+
+        # escape expected sed separators
+        s/\//\\\\\//g
+        s/\"/\\\\\"/g
+
+        # escape syntax characters
+        s/&/\\\\\&/g
+      "
+
+fi
+
+# signalize success
+exit 0
+

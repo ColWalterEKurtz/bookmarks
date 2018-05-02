@@ -1,0 +1,251 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# bookmark files
+readonly GLOBAL_INDEXFILE="$HOME/.bookmarks/index.html"
+readonly GLOBAL_STYLEFILE="$HOME/.bookmarks/style.css"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# --------------
+# get_html_title
+# --------------
+#
+# This function extracts the title (tag) from a web page and
+# pushes it to stdout.
+#
+# $1  URL
+#
+function get_html_title()
+{
+  # send query
+  wget --quiet                                                \
+       --user-agent=""                                        \
+       --timeout="60"                                         \
+       -O -                                                   \
+       "$1"                                                   \
+  | tr "\n" " "                                               \
+  | sed -re "s/</\x0A</g"                                     \
+  | sed -re "/^<script/,/^<\/script>/ d"                      \
+  | sed -re "s/[[:space:]]+/ /g"                              \
+  | sed -re "$ s/$/\x0A/"                                     \
+  | sed -nre "s/<[Tt][Ii][Tt][Ll][Ee][^>]*>(.+)/\1/p ; T ; q" \
+  | sed -re "s/[[:space:]]+/ /g ; s/^ // ; s/ $//"            \
+  | ./0.htmlescape -u                                         \
+  | ./0.htmlescape
+}
+
+# -------------
+# get_first_tag
+# -------------
+#
+# $1  filename
+# $2  tag
+#
+function get_first_tag()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        s/^[[:space:]]*$2=(.*)/\1/p ; T ; q
+
+      " "$1"
+}
+
+# --------------------
+# get_all_used_classes
+# --------------------
+#
+# This function pushes all used classes from the bookmarks file to stdout.
+# A class name should not contain spaces.
+#
+function get_all_used_classes()
+{
+  cat "$GLOBAL_INDEXFILE"                    \
+  | sed -nre "s/.+class=\"([^\"]+)\".+/\1/p" \
+  | sed -re "s/[[:space:]]+/\x0A/"           \
+  | sort                                     \
+  | uniq                                     \
+  | sed -re "s/^/# CLASS=/"
+}
+
+# -------------------------
+# get_all_specified_classes
+# -------------------------
+#
+# This function concatenates all specified classes.
+#
+# $1  filename
+#
+function get_all_specified_classes()
+{
+  cat "$1"                                    \
+  | sed -nre "s/^[[:space:]]*CLASS=(.+)/\1/p" \
+  | sed -re "/unspecified/d"                  \
+  | tr "\n" " "                               \
+  | sed -re "s/^[[:space:]]*// ; s/[[:space:]]$//"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# get current time
+readonly TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S %Z")
+
+# init files
+if ! ./0.init ; then
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# create temporary file
+TEMPFILE=$(mktemp)
+
+# remove temporary file on exit
+trap 'rm -f "$TEMPFILE"' EXIT
+
+# redirect entire group
+{
+
+  echo "URL="
+  echo
+  echo "# CLASS="
+  get_all_used_classes
+
+} > "$TEMPFILE"
+
+# wait for user input
+./0.tempmod -x5 -y105 -w400 -h650 "$TEMPFILE"
+
+# get first specified URL
+URL=$(get_first_tag "$TEMPFILE" "URL")
+
+# no URL found
+if [ -z "$URL" ] ; then
+
+  # notify user
+  failmsg "no bookmark created: no URL found"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# get all specified classes
+CLASSES=$(get_all_specified_classes "$TEMPFILE")
+
+# no classes given
+if [ -z "$CLASSES" ] ; then
+
+  # use default class
+  CLASSES="unspecified"
+
+fi
+
+# try to get text from TITLE tag
+TITLE=$(get_html_title "$URL")
+
+# no title found
+if [ -z "$TITLE" ] ; then
+
+  # notify user
+  warnmsg "no title found: using entire URL ($URL)"
+
+  # use entire URL
+  TITLE="$URL"
+
+fi
+
+# create new bookmark
+STARTTAG="<span class=\"$CLASSES\" data-when=\"$TIMESTAMP\">"
+ANCHOR="<a href=\"$URL\" target=\"_blank\">$TITLE</a>"
+ENDTAG="</span>"
+
+# insert new bookmark
+sed -i".bak" -re "/INSERT:HERE:DO:NOT:REMOVE:THIS:LINE/a ${STARTTAG}${ANCHOR}${ENDTAG}" "$GLOBAL_INDEXFILE"
+
+# signalize success
+exit 0
+
